@@ -1,0 +1,33 @@
+version: '3.8'
+
+services:
+  blindspot-platform:
+    build: .
+    container_name: blindspot-assessment
+    ports:
+      - "8501:8501"
+    volumes:
+      - ./uploads:/app/uploads
+      - ./reports:/app/reports
+    environment:
+      - STREAMLIT_SERVER_MAXUPLOADSIZE=200
+    networks:
+      - blindspot-net
+
+  # Optional: nginx reverse proxy
+  nginx:
+    image: nginx:alpine
+    container_name: blindspot-nginx
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+    depends_on:
+      - blindspot-platform
+    networks:
+      - blindspot-net
+
+networks:
+  blindspot-net:
+    driver: bridge

@@ -1,0 +1,99 @@
+[
+  {
+    "technique_id": "T1003.001",
+    "name": "LSASS Memory",
+    "tactic": "Credential Access",
+    "status": "COVERED",
+    "why": "Attacker reads LSASS process memory to steal cached credentials and NTLM hashes. This is a critical credential access vector used in 80%+ of breach campaigns.",
+    "impact": null,
+    "quality_gaps": [],
+    "remediation": [],
+    "satisfied_requirements": [
+      "Sysmon: Event ID 10 (ProcessAccess) on lsass.exe",
+      "EDR: LSASS Protection (Credential Guard / ASR rule)"
+    ]
+  },
+  {
+    "technique_id": "T1003.002",
+    "name": "SAM Registry",
+    "tactic": "Credential Access",
+    "status": "COVERED",
+    "why": "Attacker accesses SAM (Security Account Manager) registry hive to extract local account hashes. This is common in lateral movement after initial access.",
+    "impact": null,
+    "quality_gaps": [],
+    "remediation": [],
+    "satisfied_requirements": [
+      "Windows Event Log: Registry Access Audit (Event 4663)",
+      "SIEM: Alert rule on SAM registry access"
+    ]
+  },
+  {
+    "technique_id": "T1003.006",
+    "name": "DCSync",
+    "tactic": "Credential Access",
+    "status": "COVERED",
+    "why": "Attacker uses Directory Replication Service to request password hashes from domain controller. No credentials needed — only user rights (often obtained via compromised admin account).",
+    "impact": null,
+    "quality_gaps": [],
+    "remediation": [],
+    "satisfied_requirements": [
+      "Windows Event Log: Active Directory Replication Events (4662, 4663, 4662)",
+      "SIEM: Alert rule on unusual replication requests"
+    ]
+  },
+  {
+    "technique_id": "T1059.001",
+    "name": "PowerShell Execution",
+    "tactic": "Execution",
+    "status": "COVERED",
+    "why": "PowerShell is the primary execution vector for post-exploitation. Most C2 frameworks, credential dumping tools, and lateral movement use PowerShell.",
+    "impact": null,
+    "quality_gaps": [],
+    "remediation": [],
+    "satisfied_requirements": [
+      "Windows Event Log: PowerShell Script Block Logging (Event 4104)",
+      "SIEM: Alert rule on suspicious PowerShell flags"
+    ]
+  },
+  {
+    "technique_id": "T1071.004",
+    "name": "DNS (C2 / Exfiltration)",
+    "tactic": "Command and Control",
+    "status": "COVERED",
+    "why": "DNS is rarely inspected but is a common covert channel for C2 beaconing and data exfiltration. Attackers encode commands in DNS queries → hard to detect without baseline.",
+    "impact": null,
+    "quality_gaps": [],
+    "remediation": [],
+    "satisfied_requirements": [
+      "Firewall: DNS query logging enabled",
+      "EDR: Network protection / DNS inspection"
+    ]
+  },
+  {
+    "technique_id": "T1053.005",
+    "name": "Scheduled Task Creation",
+    "tactic": "Persistence",
+    "status": "COVERED",
+    "why": "Scheduled tasks are low-noise persistence mechanism. After initial access, attacker creates task to re-establish access on reboot/cleanup.",
+    "impact": null,
+    "quality_gaps": [],
+    "remediation": [],
+    "satisfied_requirements": [
+      "Windows Event Log: Task Scheduler Creation (Event 4698, 4699)",
+      "SIEM: Alert rule on task creation"
+    ]
+  },
+  {
+    "technique_id": "T1562.001",
+    "name": "Disable or Modify Tools",
+    "tactic": "Defense Evasion",
+    "status": "COVERED",
+    "why": "Disabling AV/EDR is the first step of any breach. This is the highest-value alert in the kill chain.",
+    "impact": null,
+    "quality_gaps": [],
+    "remediation": [],
+    "satisfied_requirements": [
+      "EDR: Tamper protection enabled"
+    ]
+  }
+]

@@ -1,0 +1,62 @@
+[
+  {
+    "technique_id": "T1003.001",
+    "name": "OS Credential Dumping: LSASS Memory",
+    "tactic": "Credential Access",
+    "status": "PARTIAL VISIBILITY",
+    "why": "Attacker reads LSASS process memory to steal cached creds/hashes.",
+    "impact": "Credential theft goes unseen -> attacker moves laterally with valid accounts, no alert fires until those accounts are abused elsewhere.",
+    "quality_gaps": [
+      "Sysmon: enabled but no filter/alert on lsass.exe target"
+    ],
+    "remediation": [
+      "Enable Sysmon Event ID 10 with a filter on lsass.exe as TargetImage.",
+      "Enable EDR 'Block credential stealing from LSASS memory' (ASR rule) or equivalent.",
+      "Add a SIEM correlation rule that alerts on any non-whitelisted process opening lsass.exe."
+    ]
+  },
+  {
+    "technique_id": "T1059.001",
+    "name": "Command and Scripting Interpreter: PowerShell",
+    "tactic": "Execution",
+    "status": "COVERED",
+    "why": "Most post-exploitation tooling (Mimikatz wrappers, C2 stagers, recon scripts) runs via PowerShell.",
+    "impact": null,
+    "quality_gaps": [],
+    "remediation": []
+  },
+  {
+    "technique_id": "T1562.001",
+    "name": "Impair Defenses: Disable or Modify Tools",
+    "tactic": "Defense Evasion",
+    "status": "COVERED",
+    "why": "Attacker disables AV/EDR/logging as a first step to operate freely.",
+    "impact": null,
+    "quality_gaps": [],
+    "remediation": []
+  },
+  {
+    "technique_id": "T1071.004",
+    "name": "Application Layer Protocol: DNS (C2 / Exfiltration)",
+    "tactic": "Command and Control",
+    "status": "BLIND SPOT",
+    "why": "DNS is rarely inspected but is a common covert channel for C2 and data exfiltration.",
+    "impact": "C2 beaconing over DNS blends into normal traffic; no visibility means no baseline to detect volume/entropy anomalies.",
+    "quality_gaps": [],
+    "remediation": [
+      "Enable DNS query logging on the firewall/DNS server and forward to SIEM.",
+      "Enable EDR network protection (blocks/logs connections to known-bad domains).",
+      "Add a detection rule for high-entropy / high-volume DNS queries per host."
+    ]
+  },
+  {
+    "technique_id": "T1053.005",
+    "name": "Scheduled Task/Job (Persistence)",
+    "tactic": "Persistence",
+    "status": "COVERED",
+    "why": "Common, low-noise persistence mechanism after initial access.",
+    "impact": null,
+    "quality_gaps": [],
+    "remediation": []
+  }
+]

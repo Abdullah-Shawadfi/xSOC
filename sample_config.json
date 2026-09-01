@@ -1,0 +1,61 @@
+{
+  "windows_event_logs": {
+    "powershell_script_block_logging": true,
+    "powershell_module_logging": false,
+    "registry_audit": false,
+    "scheduled_task_creation": true,
+    "ad_replication_audit": false,
+    "process_command_line": true,
+    "remote_logon_audit": true,
+    "log_clear_audit": false,
+    "file_audit": false,
+    "share_access_audit": false
+  },
+  "sysmon": {
+    "installed": true,
+    "event_id_1_process_creation": true,
+    "event_id_3_network_connection": true,
+    "event_id_10_process_access": true,
+    "event_id_11_file_create": true,
+    "event_id_13_registry_set_value": false,
+    "image_load_event": false,
+    "network_connection_event": true,
+    "registry_set_value_event": false,
+    "file_create_event": true,
+    "process_creation_event": true
+  },
+  "edr": {
+    "product": "Microsoft Defender for Endpoint",
+    "lsass_protection": false,
+    "tamper_protection": true,
+    "real_time_protection": true,
+    "network_protection": false,
+    "code_integrity_check": false,
+    "behavioral_detection": true,
+    "malware_detection": true,
+    "keyboard_input_monitoring": false
+  },
+  "firewall": {
+    "outbound_logging": true,
+    "dns_logging": false,
+    "https_inspection": false
+  },
+  "siem": {
+    "ingested_sources": [
+      "windows_security",
+      "sysmon",
+      "defender_alerts"
+    ],
+    "correlation_rules": [
+      "failed_login_burst",
+      "security_service_stopped",
+      "powershell_suspicious_alert",
+      "task_creation_alert",
+      "service_stop_alert"
+    ],
+    "log_retention_days": 30
+  },
+  "email_security": {
+    "url_sandboxing": false
+  }
+}
