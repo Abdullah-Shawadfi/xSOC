@@ -6,6 +6,7 @@ Complete Streamlit app with 5 pages
 
 import streamlit as st
 import json
+import re
 import pandas as pd
 from gap_engine import assess, calculate_coverage, KNOWLEDGE_BASE, search_techniques, REFERENCE_CATALOG
 from config_parsers import parse_sysmon_xml, parse_windows_gpo_report, parse_defender_config_json, parse_windows_firewall_json
@@ -65,6 +66,37 @@ st.markdown("""
         font-size: 12px;
         opacity: 0.65;
         margin-bottom: 18px;
+    }
+    .tactic-header-row {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        flex-wrap: wrap;
+    }
+    .tactic-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        padding: 2px 9px;
+        border-radius: 999px;
+        font-size: 13px;
+        font-weight: 600;
+    }
+    .badge-covered { background-color: #e8f5e9; color: #1b7a4d; }
+    .badge-partial { background-color: #fff3cd; color: #a5690c; }
+    .badge-blind   { background-color: #fdeaea; color: #c0392b; }
+    .tactic-bar-container {
+        background-color: rgba(128,128,128,0.2);
+        border-radius: 6px;
+        height: 9px;
+        margin: 8px 0 18px 0;
+        overflow: hidden;
+        width: 100%;
+    }
+    .tactic-bar-fill {
+        height: 100%;
+        border-radius: 6px;
+        width: 0%;
     }
 </style>
 """, unsafe_allow_html=True)
@@ -451,24 +483,65 @@ def page_dashboard():
     ])
 
     with tab1:
-        st.subheader("All Techniques Assessed")
-        for r in results:
-            status_icon = {
-                "COVERED": "✅",
-                "PARTIAL VISIBILITY": "⚠️",
-                "BLIND SPOT": "❌"
-            }[r["status"]]
+        st.subheader("All Techniques Assessed — by Tactic")
 
-            col1, col2, col3 = st.columns([1, 3, 1])
-            with col1:
-                st.write(status_icon)
-            with col2:
-                if st.button(f"**{r['technique_id']}** — {r['name']}", key=f"all_{r['technique_id']}"):
-                    st.session_state.current_page = "detail"
-                    st.session_state.selected_technique = r
-                    st.rerun()
-            with col3:
-                st.write(r["tactic"])
+        TACTIC_ORDER = [
+            "Initial Access", "Execution", "Persistence", "Privilege Escalation",
+            "Defense Evasion", "Credential Access", "Discovery", "Lateral Movement",
+            "Collection", "Command and Control", "Exfiltration", "Impact",
+        ]
+
+        by_tactic = {}
+        for r in results:
+            by_tactic.setdefault(r["tactic"], []).append(r)
+
+        ordered_tactics = [t for t in TACTIC_ORDER if t in by_tactic]
+        ordered_tactics += sorted(t for t in by_tactic if t not in TACTIC_ORDER)
+
+        status_icon = {
+            "COVERED": "✅",
+            "PARTIAL VISIBILITY": "⚠️",
+            "BLIND SPOT": "❌",
+        }
+
+        for tactic in ordered_tactics:
+            items = by_tactic[tactic]
+            t_covered = sum(1 for r in items if r["status"] == "COVERED")
+            t_partial = sum(1 for r in items if r["status"] == "PARTIAL VISIBILITY")
+            t_blind = sum(1 for r in items if r["status"] == "BLIND SPOT")
+            t_total = len(items)
+            t_pct = round((t_covered + 0.5 * t_partial) / t_total * 100) if t_total else 0
+
+            bar_color = "#2ec4b6" if t_pct >= 75 else ("#f4a261" if t_pct >= 40 else "#e63946")
+            slug = re.sub(r"[^a-z0-9]+", "_", tactic.lower())
+
+            label = f"{tactic}  ·  {t_total} techniques  —  ✅ {t_covered}  ⚠️ {t_partial}  ❌ {t_blind}"
+
+            with st.expander(label, expanded=False):
+                st.markdown(
+                    f"""
+                    <style>
+                    @keyframes grow_{slug} {{ from {{ width: 0%; }} to {{ width: {t_pct}%; }} }}
+                    </style>
+                    <div class="tactic-bar-container">
+                        <div class="tactic-bar-fill" style="width:{t_pct}%; background-color:{bar_color};
+                             animation: grow_{slug} 0.9s ease-out;"></div>
+                    </div>
+                    """,
+                    unsafe_allow_html=True,
+                )
+
+                for r in items:
+                    col1, col2, col3 = st.columns([1, 4, 1])
+                    with col1:
+                        st.write(status_icon[r["status"]])
+                    with col2:
+                        if st.button(f"**{r['technique_id']}** — {r['name']}", key=f"all_{r['technique_id']}"):
+                            st.session_state.current_page = "detail"
+                            st.session_state.selected_technique = r
+                            st.rerun()
+                    with col3:
+                        st.caption(r["status"].title())
 
     with tab2:
         st.subheader("Blind Spots — Immediate Action Required")
