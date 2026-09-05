@@ -165,15 +165,7 @@ def parse_windows_gpo_report(report_file) -> Dict[str, Any]:
 
 
 def parse_defender_config_json(defender_file) -> Dict[str, Any]:
-    """
-    Parse Microsoft Defender configuration JSON.
-    
-    Args:
-        defender_file: JSON config file from Defender
-    
-    Returns:
-        Dict with EDR configuration
-    """
+    """Parse Microsoft Defender configuration JSON (Get-MpPreference | ConvertTo-Json)."""
     try:
         if isinstance(defender_file, str):
             with open(defender_file, 'r') as f:
@@ -203,6 +195,60 @@ def parse_defender_config_json(defender_file) -> Dict[str, Any]:
     except Exception as e:
         print(f"Error parsing Defender config: {e}")
         return {"edr": {"product": "Unknown"}}
+
+
+def parse_windows_firewall_json(firewall_file) -> Dict[str, Any]:
+    """
+    Parse Windows Defender Firewall profile export.
+    Expected input: output of
+        Get-NetFirewallProfile -All | ConvertTo-Json
+    (as instructed on the Getting Started page).
+
+    Note: DNS query logging and HTTPS/TLS inspection are not exposed by
+    Get-NetFirewallProfile — Windows Firewall itself doesn't perform DNS
+    or TLS inspection, those live in a separate DNS server or proxy/NGFW
+    config. We leave those two fields False here; fill them in manually
+    (Option 3: Paste JSON) if your environment has a DNS server query log
+    or a proxy doing HTTPS inspection.
+
+    Args:
+        firewall_file: JSON file/string — either a single profile object
+            or a list of profile objects (Domain/Private/Public)
+
+    Returns:
+        Dict with firewall configuration
+    """
+    try:
+        if isinstance(firewall_file, str):
+            with open(firewall_file, 'r') as f:
+                data = json.load(f)
+        else:
+            content = firewall_file.read()
+            if isinstance(content, bytes):
+                content = content.decode('utf-8')
+            data = json.loads(content)
+
+        profiles = data if isinstance(data, list) else [data]
+
+        def _is_logging(profile: Dict[str, Any]) -> bool:
+            val = profile.get("LogAllowed", profile.get("LogBlocked"))
+            return str(val).strip().lower() in ("true", "1", "yes")
+
+        outbound_logging = any(_is_logging(p) for p in profiles)
+
+        config = {
+            "firewall": {
+                "outbound_logging": outbound_logging,
+                "dns_logging": False,       # not visible in this export — check DNS server logs separately
+                "https_inspection": False,  # not visible in this export — check proxy/NGFW config separately
+            }
+        }
+
+        return config
+
+    except Exception as e:
+        print(f"Error parsing Windows Firewall config: {e}")
+        return {"firewall": {"outbound_logging": False, "dns_logging": False, "https_inspection": False}}
 
 
 def merge_configs(*configs: Dict[str, Any]) -> Dict[str, Any]:

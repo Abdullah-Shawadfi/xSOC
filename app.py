@@ -8,7 +8,7 @@ import streamlit as st
 import json
 import pandas as pd
 from gap_engine import assess, calculate_coverage, KNOWLEDGE_BASE, search_techniques, REFERENCE_CATALOG
-from config_parsers import parse_sysmon_xml, parse_windows_gpo_report
+from config_parsers import parse_sysmon_xml, parse_windows_gpo_report, parse_defender_config_json, parse_windows_firewall_json
 from pdf_export import generate_pdf_report
 import io
 from datetime import datetime
@@ -242,24 +242,58 @@ def page_upload():
                 st.error("❌ Invalid JSON file")
 
     with col2:
-        st.subheader("Option 2: Parse Sysmon XML")
-        sysmon_file = st.file_uploader("Upload Sysmon config.xml", type="xml")
+        st.subheader("Option 2: Parse Tool Export")
+        st.caption("Upload the file exported from each tool (see Getting Started for the export command)")
 
-        if sysmon_file:
-            try:
-                sysmon_config = parse_sysmon_xml(sysmon_file)
-                if st.session_state.config is None:
-                    st.session_state.config = {}
-                st.session_state.config.update(sysmon_config)
-                st.success("✅ Sysmon configuration parsed")
-            except Exception as e:
-                st.error(f"❌ Error parsing Sysmon XML: {e}")
+        tab_sysmon, tab_gpo, tab_defender, tab_fw = st.tabs(["Sysmon", "Windows Event Log", "Defender", "Firewall"])
+
+        def _merge_parsed(parsed_config):
+            if st.session_state.config is None:
+                st.session_state.config = {}
+            st.session_state.config.update(parsed_config)
+
+        with tab_sysmon:
+            sysmon_file = st.file_uploader("sysmon_config.xml", type="xml", key="sysmon_uploader")
+            if sysmon_file:
+                try:
+                    _merge_parsed(parse_sysmon_xml(sysmon_file))
+                    st.success("✅ Sysmon configuration parsed")
+                except Exception as e:
+                    st.error(f"❌ Error parsing Sysmon XML: {e}")
+
+        with tab_gpo:
+            gpo_file = st.file_uploader("audit_policy.txt", type=["txt", "json"], key="gpo_uploader")
+            if gpo_file:
+                try:
+                    _merge_parsed(parse_windows_gpo_report(gpo_file))
+                    st.success("✅ Windows Event Log audit policy parsed")
+                except Exception as e:
+                    st.error(f"❌ Error parsing audit policy: {e}")
+
+        with tab_defender:
+            defender_file = st.file_uploader("defender_config.json", type="json", key="defender_uploader")
+            if defender_file:
+                try:
+                    _merge_parsed(parse_defender_config_json(defender_file))
+                    st.success("✅ Defender configuration parsed")
+                except Exception as e:
+                    st.error(f"❌ Error parsing Defender config: {e}")
+
+        with tab_fw:
+            fw_file = st.file_uploader("firewall_config.json", type="json", key="fw_uploader")
+            if fw_file:
+                try:
+                    _merge_parsed(parse_windows_firewall_json(fw_file))
+                    st.success("✅ Firewall configuration parsed")
+                    st.caption("ℹ️ DNS logging & HTTPS inspection aren't in this export — set them via Option 4 or Option 3 if applicable.")
+                except Exception as e:
+                    st.error(f"❌ Error parsing firewall config: {e}")
 
     st.markdown("---")
 
     # Or paste JSON
     st.subheader("Option 3: Paste JSON Directly")
-    json_text = st.text_area("Paste your JSON configuration here:", height=300)
+    json_text = st.text_area("Paste your JSON configuration here:", height=200)
 
     if json_text:
         try:
@@ -269,6 +303,76 @@ def page_upload():
                 st.success("✅ Configuration loaded from text")
         except json.JSONDecodeError:
             st.error("❌ Invalid JSON format")
+
+    st.markdown("---")
+
+    # SIEM manual checklist — there's no universal export format across
+    # Splunk/ELK/Sentinel/QRadar, so instead of guessing at a parser that
+    # will only work for one vendor, we ask directly what's enabled.
+    st.subheader("Option 4: SIEM Correlation Rules (checklist)")
+    st.caption("No single export format works across SIEM vendors — tick what's actually enabled in yours.")
+
+    SIEM_RULES = [
+        "accessibility_persistence_alert", "account_creation_alert", "account_lockout_alert",
+        "account_manipulation_alert", "admin_share_alert", "ads_alert",
+        "anomalous_logon_alert", "archive_utility_alert", "audio_capture_alert",
+        "auth_process_modification_alert", "automated_collection_alert", "automated_exfil_alert",
+        "browser_credential_theft_alert", "c2_domain_alert", "cached_creds_alert",
+        "chunked_exfil_alert", "client_exploit_alert", "clipboard_capture_alert",
+        "cloud_account_alert", "cloud_account_transfer_alert", "cloud_exfil_alert",
+        "cmd_suspicious_alert", "code_repo_exfil_alert", "cookie_forgery_alert",
+        "credential_exploit_alert", "credential_file_access_alert", "data_destruction_alert",
+        "data_manipulation_alert", "data_staging_alert", "dcom_lateral_alert",
+        "dcshadow_alert", "dcsync_alert", "defacement_alert",
+        "default_account_logon_alert", "deobfuscation_alert", "deployment_tool_abuse_alert",
+        "discovery_tool_alert", "disk_wipe_alert", "dll_hijack_alert",
+        "dns_anomaly_alert", "dos_alert", "drive_by_alert",
+        "email_collection_alert", "encoded_c2_alert", "encrypted_c2_alert",
+        "endpoint_dos_alert", "exfil_volume_alert", "exploit_attempt_alert",
+        "external_remote_access_alert", "fallback_channel_alert", "financial_theft_alert",
+        "forced_auth_alert", "gpo_modification_alert", "gpp_password_alert",
+        "hidden_file_alert", "hidden_window_alert", "internal_phishing_alert",
+        "invalid_signature_alert", "kerberoast_alert", "lateral_tool_transfer_alert",
+        "log_clear_alert", "logon_script_persistence_alert", "lolbin_abuse_alert",
+        "lsa_secrets_alert", "lsass_access_alert", "malicious_extension_alert",
+        "malicious_file_execution_alert", "masquerading_alert", "mass_file_access_alert",
+        "mfa_fatigue_alert", "mfa_interception_alert", "multistage_c2_alert",
+        "native_api_abuse_alert", "new_service_alert", "nonstandard_port_alert",
+        "nonstandard_protocol_alert", "ntds_dump_alert", "obfuscated_payload_alert",
+        "pass_the_hash_alert", "permission_modification_alert", "phishing_link_alert",
+        "port_scan_alert", "powershell_suspicious_alert", "process_hollowing_alert",
+        "process_injection_alert", "proxy_c2_alert", "python_execution_alert",
+        "ransomware_alert", "rdp_alert", "rdp_hijack_alert",
+        "reflective_load_alert", "registry_modification_alert", "remote_access_tool_alert",
+        "remote_exploit_alert", "removable_media_alert", "resource_hijack_alert",
+        "rogue_cert_alert", "sam_access_alert", "sandbox_evasion_alert",
+        "scheduled_exfil_alert", "screen_capture_alert", "security_software_discovery_alert",
+        "service_stop_alert", "session_hijack_alert", "shadow_copy_deletion_alert",
+        "shared_module_alert", "shortcut_persistence_alert", "sid_history_alert",
+        "skeleton_key_alert", "ssh_lateral_alert", "ssp_persistence_alert",
+        "supply_chain_alert", "tainted_content_alert", "task_creation_alert",
+        "token_theft_alert", "tool_transfer_alert", "traffic_signaling_alert",
+        "trusted_relationship_alert", "tunneling_alert", "uac_bypass_alert",
+        "unexpected_shutdown_alert", "vbs_execution_alert", "video_capture_alert",
+        "vnc_lateral_alert", "webservice_c2_alert", "webshell_alert",
+        "winlogon_persistence_alert", "wmi_execution_alert", "wmi_persistence_alert",
+    ]
+    SIEM_SOURCES = ["windows_security", "sysmon", "defender_alerts", "firewall", "dns", "proxy"]
+
+    with st.expander("Fill in SIEM configuration", expanded=False):
+        selected_rules = st.multiselect("Enabled correlation rules", SIEM_RULES, key="siem_rules")
+        selected_sources = st.multiselect("Ingested log sources", SIEM_SOURCES, key="siem_sources")
+        retention_days = st.number_input("Log retention (days)", min_value=0, value=30, key="siem_retention")
+
+        if st.button("Apply SIEM configuration"):
+            _merge_parsed({
+                "siem": {
+                    "ingested_sources": selected_sources,
+                    "correlation_rules": selected_rules,
+                    "log_retention_days": retention_days,
+                }
+            })
+            st.success("✅ SIEM configuration applied")
 
     # Config summary
     if st.session_state.config:
